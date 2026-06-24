@@ -1,0 +1,48 @@
+name: nomba-prestashop
+
+services:
+  mysql:
+    image: mariadb:10.11
+    container_name: nomba_ps_db
+    environment:
+      MARIADB_ROOT_PASSWORD: prestashop
+      MARIADB_DATABASE: prestashop
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  prestashop:
+    image: prestashop/prestashop:8.1-apache
+    container_name: nomba_ps_shop
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      DB_SERVER: mysql
+      DB_NAME: prestashop
+      DB_USER: root
+      DB_PASSWD: prestashop
+      PS_INSTALL_AUTO: 1
+      PS_ERASE_DB: 0
+      PS_DEV_MODE: 1
+      PS_DOMAIN: localhost:8080
+      PS_FOLDER_ADMIN: admin-dev
+      PS_FOLDER_INSTALL: install-dev
+      PS_LANGUAGE: en
+      PS_COUNTRY: ng
+      ADMIN_MAIL: admin@nomba.test
+      ADMIN_PASSWD: nomba12345
+    volumes:
+      - ps_data:/var/www/html
+      # Live-mount our module so local edits appear instantly inside PrestaShop.
+      - ./modules/nomba:/var/www/html/modules/nomba
+
+volumes:
+  db_data:
+  ps_data:
