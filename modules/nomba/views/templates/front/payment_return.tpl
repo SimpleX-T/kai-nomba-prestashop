@@ -17,6 +17,18 @@
     </div>
     <p><a href="index.php?controller=contact" class="btn btn-primary">
       {l s='Contact support' mod='nomba'}</a></p>
+  {elseif isset($nomba_status) && $nomba_status == 'FAILED'}
+    <div class="alert alert-danger">
+      <p>{l s='Payment Failed' mod='nomba'}</p>
+      {if isset($nomba_message) && $nomba_message}
+        <p><strong>{$nomba_message}</strong></p>
+      {/if}
+      {if isset($nomba_order_reference)}
+        <p><small>{l s='Reference: ' mod='nomba'}{$nomba_order_reference}</small></p>
+      {/if}
+    </div>
+    <p><a href="index.php?controller=order&step=1" class="btn btn-secondary">
+      {l s='Try again' mod='nomba'}</a></p>
   {elseif isset($nomba_status) && $nomba_status == 'PENDING'}
     <div class="alert alert-info">
       <p>{l s='Your Nomba payment is being confirmed. We will email you shortly.' mod='nomba'}</p>
@@ -28,7 +40,12 @@
       {l s='Return to checkout' mod='nomba'}</a></p>
   {else}
     <div class="alert alert-warning">
-      <p>{l s='We could not confirm your Nomba payment. If you were charged, contact support.' mod='nomba'}</p>
+      <p>{l s='Payment Failed' mod='nomba'}</p>
+      {if isset($nomba_message) && $nomba_message}
+        <p><strong>{$nomba_message}</strong></p>
+      {else}
+        <p>{l s='We could not confirm your Nomba payment. If you were charged, contact support.' mod='nomba'}</p>
+      {/if}
       {if isset($nomba_order_reference)}
         <p><small>{l s='Reference: ' mod='nomba'}{$nomba_order_reference}</small></p>
       {/if}

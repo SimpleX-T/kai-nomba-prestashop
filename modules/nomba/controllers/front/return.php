@@ -24,6 +24,7 @@ class NombaReturnModuleFrontController extends ModuleFrontController
         }
 
         $status = $row['status'];
+        $failureMessage = Tools::getValue('message', '');
 
         $orderId = 0;
         $secureKey = '';
@@ -32,6 +33,11 @@ class NombaReturnModuleFrontController extends ModuleFrontController
             try {
                 $res = $this->module->getApiClient()->verifyByOrderReference($orderReference);
                 $remoteStatus = isset($res['data']['status']) ? strtoupper($res['data']['status']) : '';
+
+                if (empty($failureMessage)) {
+                    $failureMessage = isset($res['data']['gatewayMessage']) ? $res['data']['gatewayMessage'] : '';
+                }
+
                 if (in_array($remoteStatus, ['SUCCESS', 'COMPLETED'], true)) {
                     $transactionId = isset($res['data']['id']) ? $res['data']['id'] : '';
 
@@ -48,6 +54,11 @@ class NombaReturnModuleFrontController extends ModuleFrontController
                         $secureKey = isset($result['secure_key']) ? $result['secure_key'] : '';
                     }
                 } elseif (in_array($remoteStatus, ['FAILED', 'DECLINED'], true)) {
+                    if (empty($failureMessage)) {
+                        $failureMessage = $remoteStatus === 'DECLINED'
+                            ? $this->module->l('Your card was declined.', 'return')
+                            : $this->module->l('Payment failed.', 'return');
+                    }
                     Db::getInstance()->update(
                         'nomba_transaction',
                         ['status' => 'FAILED', 'date_upd' => date('Y-m-d H:i:s')],
@@ -57,6 +68,9 @@ class NombaReturnModuleFrontController extends ModuleFrontController
                 }
             } catch (NombaApiException $e) {
                 PrestaShopLogger::addLog('Nomba verify failed: ' . $e->getMessage(), 2);
+                if (empty($failureMessage)) {
+                    $failureMessage = $this->module->l('Could not verify payment status.', 'return');
+                }
             }
         }
 
@@ -79,6 +93,7 @@ class NombaReturnModuleFrontController extends ModuleFrontController
             'nomba_order_reference' => $orderReference,
             'nomba_amount' => $row['amount'],
             'nomba_currency' => $row['currency'],
+            'nomba_message' => $failureMessage,
         ]);
         $this->setTemplate('module:nomba/views/templates/front/payment_return.tpl');
     }
