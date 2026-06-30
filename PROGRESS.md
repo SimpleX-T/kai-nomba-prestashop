@@ -48,7 +48,7 @@
 ## 4. Current state
 
 **Sandbox-tested: checkout → payment → order fulfilment → order confirmation page all working.**
-**Webhooks + refunds still need sandbox verification (blocked on public tunnel).**
+**Webhook form submitted to Nomba — awaiting activation. Refunds blocked until webhook provides correct `transactionId`.**
 
 Files and their purpose:
 
@@ -59,7 +59,7 @@ Files and their purpose:
 | `modules/nomba/nomba.php` | PaymentModule: install/uninstall, config form, hooks (header, paymentOptions, paymentReturn, admin refund) | complete, sandbox-tested |
 | `modules/nomba/classes/NombaApi.php` | API client: token (persistent cache), createOrder, verify, refund, HMAC verify | complete |
 | `modules/nomba/controllers/front/redirect.php` | cart → createOrder → redirect to checkoutLink (DB insert wrapped in try-catch) | complete, sandbox-tested |
-| `modules/nomba/controllers/front/webhook.php` | HMAC verify → validateOrder (idempotent); handles payment_success + payment_failed | complete, untested (needs tunnel) |
+| `modules/nomba/controllers/front/webhook.php` | HMAC verify → validateOrder (idempotent); handles payment_success + payment_failed | complete, awaiting Nomba webhook activation |
 | `modules/nomba/controllers/front/return.php` | customer return → verify → validateOrder (fallback) → order-confirmation redirect | complete, sandbox-tested |
 | `modules/nomba/sql/install.php` / `uninstall.php` | `nomba_transaction` table with refunded_amount tracking | complete |
 | `modules/nomba/views/templates/front/*.tpl` | return + error templates with navigation links | polished, all cases handled (SUCCESS/PENDING/ORDER_FAILED/FAILED) |
@@ -82,25 +82,18 @@ All PHP passes `php -l`.
       polished return/error templates with navigation links, admin refund panel, `build.sh` script
       for `.zip` packaging.
 
-## 6. Open items (to complete before submission)
+## 6. Open items (to complete before final submission)
 
-- [ ] **Webhook tunnel.** Set up ngrok/cloudflared: `cloudflared tunnel --url http://localhost:8080`
-      then register `<tunnel>/module/nomba/webhook` in Nomba dashboard → Settings → Webhooks & API Keys.
-      Subscribe to `payment_success` + `payment_failed` events. Paste the Signature Key into module config.
-- [ ] **Verify webhook payload.** Once tunnel is up, make a sandbox payment and confirm:
-  - `extractOrderReference()` finds the merchant reference at the correct field path
-  - Webhook event type strings match `payment_success` / `payment_failed`
-  - HMAC signature verification succeeds
-  - The `transactionId` from the webhook is saved (enables refunds)
-- [ ] **Test refund flow.** From admin order screen, enter a refund amount and submit.
-      Confirm the Nomba API accepts the call and `refunded_amount` updates in the DB.
-- [ ] **Test error states:**
-  - Declined card (`5484 4972 1831 7651`) → show error template
-  - OTP timeout (success card + OTP `1234`) → PENDING status shown
-  - Insufficient funds (amount > 500,000) → graceful decline
-- [ ] **Verify transaction ID capture.** The verify endpoint returns `data.id` (format `WEB-ONLINE_C-{...}`).
-      The return controller now saves it, but confirm it matches the webhook's `transactionId`.
-- [ ] **Package.** Run `bash modules/nomba/build.sh` and verify the `.zip` installs cleanly on a fresh PrestaShop.
+- [ ] **Wait for Nomba to activate webhook.** Form submitted via ngrok URL
+      (`https://alix-unecliptic-infinitivally.ngrok-free.dev/module/nomba/webhook`).
+      Once active: verify payload fields, HMAC signature, and `transactionId` capture.
+- [ ] **Test refund flow.** Requires correct `transactionId` (`WEB-ONLINE_C-{...}`)
+      from the webhook. Current DB has a POS biller transaction ID (wrong format).
+- [ ] **Error states:** Nomba sandbox does NOT redirect back to callback URL on payment failure
+      (user stays on `pay.nomba.com/sandbox/...` with "Try Again" button). Error templates
+      exist but are only reached on success + verify failure path. Webhook `payment_failed`
+      handler should fill this gap once activated.
+- [ ] **Package.** Run `bash modules/nomba/build.sh` and verify the `.zip` installs cleanly.
 
 ## 7. Environment / how to run
 
@@ -122,6 +115,14 @@ All PHP passes `php -l`.
 
 ## 8. Session log (newest first)
 
+- **2026-07-01** — Progress-check submission prep + intermediate page revert.
+  - Discovered Nomba sandbox does NOT redirect to callback URL on payment failure
+    (user stays on `pay.nomba.com/sandbox/...` with "Try Again" button).
+  - Attempted PRG pattern with intermediate page (`payment_redirect.tpl`) to give
+    users a way back on failure, but createOrder API failed unexpectedly during test
+    (likely token/session issue). Reverted to simple `Tools::redirect()` approach.
+  - Webhook controller already handles `payment_failed` events — just awaiting Nomba activation.
+  - Updated PROGRESS.md for progress-check submission.
 - **2026-06-30 (session 2)** — Full sandbox test pass completed.
   - Fixed `$this->name = 'kai'` → `'nomba'` (mismatch caused blank configure page;
     module ID was null, controller skipped rendering configure output).
