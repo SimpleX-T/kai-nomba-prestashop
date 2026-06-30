@@ -15,7 +15,7 @@ class NombaWebhookModuleFrontController extends ModuleFrontController
 {
     /** No CSRF / no human session on this endpoint. */
     public $auth = false;
-    public $ssl = true;
+    public $ssl = false;
 
     public function initContent()
     {
